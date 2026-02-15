@@ -1,0 +1,47 @@
+// PhishGuard Use Case Diagram
+digraph PhishGuard_UseCase {
+	rankdir=LR size="8,5"
+	node [fillcolor=lightblue shape=ellipse style=filled]
+	node [fillcolor=white shape=box style=filled]
+	User [label="User
+(Mobile App)"]
+	Backend [label="PhishGuard Backend
+(AI Scanner)" fillcolor=lightgrey shape=box style=filled]
+	node [fillcolor=aliceblue shape=ellipse style=filled]
+	subgraph cluster_Auth {
+		label=Authentication style=dashed
+		Login [label="Login
+(Email/Google)"]
+		Register [label="Register Account"]
+		Logout [label=Logout]
+	}
+	subgraph cluster_Features {
+		label="Scanning Features" style=dashed
+		ScanURL [label="Scan Website URL"]
+		ScanQR [label="Scan QR Code"]
+		ScanSMS [label="Extract & Scan
+SMS Links"]
+		ViewResults [label="View Risk Analysis
+(Safe/Phishing)"]
+	}
+	subgraph cluster_Management {
+		label="Data Management" style=dashed
+		ViewHistory [label="View Scan History"]
+		ClearHistory [label="Clear History"]
+		ViewProfile [label="View Profile Stats"]
+	}
+	User -> Login
+	User -> Register
+	User -> Logout
+	User -> ScanURL
+	User -> ScanQR
+	User -> ScanSMS
+	User -> ViewHistory
+	User -> ViewProfile
+	ScanURL -> ViewResults [label=<<include>> style=dashed]
+	ScanQR -> ViewResults [label=<<include>> style=dashed]
+	ScanSMS -> ViewResults [label=<<include>> style=dashed]
+	ViewHistory -> ClearHistory [label=<<extend>> style=dashed]
+	ScanURL -> Backend [label="API Request"]
+	Login -> Backend [label="Auth Check"]
+}
