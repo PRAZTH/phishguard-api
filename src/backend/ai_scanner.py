@@ -1,10 +1,8 @@
-# FILE: backend/ai_scanner.py
 import os
 from huggingface_hub import InferenceClient
-import time
 
-# 👇 This gets the token from Render, OR uses your hardcoded one as a valid backup.
-HF_TOKEN = os.environ.get("HF_TOKEN", "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")
+# This grabs the token you provided from Render's secret settings
+HF_TOKEN = os.environ.get("HF_TOKEN", "")
 
 FREE_MODELS = [
     "Qwen/Qwen2.5-7B-Instruct",
@@ -15,62 +13,36 @@ FREE_MODELS = [
 ]
 
 def configure_ai():
-    # Only fail if the token is completely empty or explicitly the placeholder text "PASTE_HERE"
-    if not HF_TOKEN or HF_TOKEN == "hf_PASTE_YOUR_TOKEN_HERE":
-        print("❌ ERROR: You must paste your Hugging Face Token in ai_scanner.py")
+    if not HF_TOKEN:
+        print("⚠️ WARNING: HF_TOKEN is empty in environment variables.")
 
 def get_ai_explanation(url):
-    # Only fail if empty
-    if not HF_TOKEN or HF_TOKEN == "hf_PASTE_YOUR_TOKEN_HERE":
-        return "Unknown", ["❌ Error: Token is missing in ai_scanner.py"]
+    if not HF_TOKEN:
+        return "Unknown", ["❌ Error: Server environment is missing the AI Token."]
 
     last_error = ""
-    
     for model_id in FREE_MODELS:
         try:
-            print(f"🔄 Trying AI Model (Chat Mode): {model_id}...")
+            print(f"🔄 Trying AI Model: {model_id}...")
             client = InferenceClient(model=model_id, token=HF_TOKEN)
 
             messages = [
-                { "role": "system", "content": "You are a cybersecurity expert. Analyze the URL for phishing." },
-                { "role": "user", "content": f"""Analyze this URL: {url}
-                
-                Reply STRICTLY in this format:
-                Status: [Phishing/Safe/Suspicious]
-                - [Reason 1]
-                - [Reason 2]
-                - [Reason 3]""" }
+                { "role": "system", "content": "You are a cybersecurity expert." },
+                { "role": "user", "content": f"Analyze this URL for phishing: {url}. Reply with Status: [Safe/Phishing/Suspicious] and 3 short bullet reasons." }
             ]
 
             response = client.chat_completion(messages, max_tokens=500)
             text = response.choices[0].message.content.strip()
             
-            print(f"✅ Success with {model_id}!")
-            print(f"🔹 AI Raw Response: {text}")
-
-            result = "Unknown"
-            if "Status: Phishing" in text:
-                result = "Phishing"
-            elif "Status: Safe" in text:
-                result = "Safe"
-            elif "Status: Suspicious" in text:
-                result = "Suspicious"
+            result = "Safe"
+            if "Phishing" in text: result = "Phishing"
+            elif "Suspicious" in text: result = "Suspicious"
             
-            explanation = [
-                line.replace('- ', '').replace('* ', '').strip() 
-                for line in text.split('\n') 
-                if line.strip().startswith(('-','*'))
-            ]
-            
-            if not explanation:
-                explanation = [text]
-
-            return result, explanation
+            explanation = [line.strip() for line in text.split('\n') if line.strip().startswith(('-', '*'))]
+            return result, explanation if explanation else [text]
 
         except Exception as e:
-            print(f"⚠️ Model {model_id} failed: {e}")
             last_error = str(e)
             continue 
 
-    print("❌ All AI models failed.")
-    return "Unknown", [f"Error: All free models busy. Last error: {last_error}"]
+    return "Unknown", [f"Error: AI models are currently busy. {last_error}"]
