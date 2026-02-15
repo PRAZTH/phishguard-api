@@ -12,10 +12,6 @@ FREE_MODELS = [
     "HuggingFaceH4/zephyr-7b-beta"
 ]
 
-def configure_ai():
-    if not HF_TOKEN:
-        print("⚠️ WARNING: HF_TOKEN is empty in environment variables.")
-
 def get_ai_explanation(url):
     if not HF_TOKEN:
         return "Unknown", ["❌ Error: Server environment is missing the AI Token."]
@@ -26,22 +22,25 @@ def get_ai_explanation(url):
             print(f"🔄 Trying AI Model: {model_id}...")
             client = InferenceClient(model=model_id, token=HF_TOKEN)
 
-            messages = [
-                { "role": "system", "content": "You are a cybersecurity expert." },
-                { "role": "user", "content": f"Analyze this URL for phishing: {url}. Reply with Status: [Safe/Phishing/Suspicious] and 3 short bullet reasons." }
-            ]
-
-            response = client.chat_completion(messages, max_tokens=500)
-            text = response.choices[0].message.content.strip()
+            # 👇 FIXED: Using the standard 'post' method or 'chat' if supported
+            # This is the most compatible way for free inference models
+            prompt = f"System: You are a cybersecurity expert.\nUser: Analyze this URL for phishing: {url}. Reply with Status: [Safe/Phishing/Suspicious] and 3 short bullet reasons."
             
+            # Using text_generation as a fallback which is highly stable
+            text = client.text_generation(prompt, max_new_tokens=500)
+            
+            print(f"✅ Success with {model_id}!")
+            
+            # Simple parsing logic
             result = "Safe"
             if "Phishing" in text: result = "Phishing"
             elif "Suspicious" in text: result = "Suspicious"
             
             explanation = [line.strip() for line in text.split('\n') if line.strip().startswith(('-', '*'))]
-            return result, explanation if explanation else [text]
+            return result, explanation if explanation else [text.strip()]
 
         except Exception as e:
+            print(f"⚠️ {model_id} failed: {str(e)}")
             last_error = str(e)
             continue 
 
