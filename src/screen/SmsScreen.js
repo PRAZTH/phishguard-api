@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { 
   StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, 
   KeyboardAvoidingView, Platform, Alert, ActivityIndicator, 
-  ImageBackground, Dimensions, Linking, AppState 
+  ImageBackground, Dimensions, Linking, AppState, Vibration 
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons'; 
 
-const SERVER_URL = "https://phishguard-api-1-t6wy.onrender.com/scan";
+// 👇 UPDATED: Pointing to the base Render URL
+const SERVER_URL = "https://phishguard-api-1-t6wy.onrender.com";
 const { width, height } = Dimensions.get('window');
 
 export default function SmsScreen({ onNavigate }) {
@@ -16,9 +17,7 @@ export default function SmsScreen({ onNavigate }) {
   const [loading, setLoading] = useState(false);
   const appState = React.useRef(AppState.currentState);
 
-  // 👇 IMPROVED REGEX: Catches links like "viapp.onelink.me"
   const extractUrlFromText = (text) => {
-    // Matches http, https, OR things like google.com, bit.ly, etc.
     const urlRegex = /((https?:\/\/)|(www\.)|(?:[a-zA-Z0-9-]+\.)+[a-z]{2,})[^\s]*/gi;
     const matches = text.match(urlRegex);
     return matches ? matches[0] : null;
@@ -57,14 +56,14 @@ export default function SmsScreen({ onNavigate }) {
         return; 
     }
 
-    // 👇 FIX: Prepend https:// if missing, so the backend can read it
     if (!foundUrl.startsWith('http')) {
         foundUrl = 'https://' + foundUrl;
     }
 
     setLoading(true);
     try {
-      const response = await fetch(SERVER_URL, {
+      // 👇 UPDATED: Correct endpoint path
+      const response = await fetch(`${SERVER_URL}/scan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: foundUrl }),
@@ -75,6 +74,13 @@ export default function SmsScreen({ onNavigate }) {
       if (data.error) {
         Alert.alert("Server Error", data.error);
       } else {
+        // --- VIBRATION FEEDBACK ---
+        if (data.result !== "Safe") {
+            Vibration.vibrate([0, 500, 200, 500]); // Danger pattern: Long pulses
+        } else {
+            Vibration.vibrate(100); // Short pulse for safe
+        }
+
         const newLog = { 
             id: Date.now().toString(), 
             url: data.url, 
@@ -94,7 +100,7 @@ export default function SmsScreen({ onNavigate }) {
       }
     } catch (error) {
       setLoading(false);
-      Alert.alert("Connection Failed", "Check your Server IP.");
+      Alert.alert("Connection Failed", "Backend is unreachable. Check Render logs.");
     }
   };
 
@@ -108,18 +114,17 @@ export default function SmsScreen({ onNavigate }) {
         <View style={styles.overlay} />
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={styles.scrollContainer}>
-            
             <View style={styles.header}>
                 <Ionicons name="chatbubble-ellipses" size={50} color="#fff" />
                 <Text style={styles.title}>SMS Guard</Text>
-                <Text style={styles.subtitle}>Copy suspicious texts to scan</Text>
+                <Text style={styles.subtitle}>Scan links from messages</Text>
             </View>
             
             <View style={styles.card}>
                 <View style={styles.instructionBox}>
                     <Text style={styles.stepText}>1. Open Messages.</Text>
                     <Text style={styles.stepText}>2. Copy the text.</Text>
-                    <Text style={styles.stepText}>3. Return here (Auto-Paste).</Text>
+                    <Text style={styles.stepText}>3. Return here.</Text>
                 </View>
 
                 <TouchableOpacity style={styles.openAppButton} onPress={openMessagesApp}>
@@ -147,7 +152,7 @@ export default function SmsScreen({ onNavigate }) {
                         setSmsText(text);
                     }}>
                         <Ionicons name="clipboard-outline" size={18} color="#fff" />
-                        <Text style={styles.btnTextSmall}> Manual Paste</Text>
+                        <Text style={styles.btnTextSmall}> Paste</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.greyButton} onPress={() => setSmsText('')}>
                         <Ionicons name="trash-outline" size={18} color="#fff" />
