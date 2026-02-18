@@ -1,21 +1,25 @@
-# FILE: backend/ai_scanner.py
+import os
 from huggingface_hub import InferenceClient
-import re
+from dotenv import load_dotenv
 
-# 👇 PASTE YOUR HUGGING FACE TOKEN HERE (starts with hf_)
-HF_TOKEN = "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"
+# Load variables from the local .env file
+load_dotenv()
+
+# Retrieve the token securely from the environment
+HF_TOKEN = os.getenv("HF_TOKEN")
 
 def configure_ai():
-    """Checks if the token is present."""
-    if HF_TOKEN == "hf_PASTE_YOUR_TOKEN_HERE" or not HF_TOKEN:
-        print("❌ ERROR: You must paste your Hugging Face Token in ai_scanner.py")
+    """Checks if the token is present in the environment."""
+    if not HF_TOKEN:
+        print("❌ ERROR: HF_TOKEN not found in environment variables!")
 
 def get_ai_explanation(url):
     try:
-        if HF_TOKEN == "hf_PASTE_YOUR_TOKEN_HERE":
+        # Check if token exists before trying to use it
+        if not HF_TOKEN:
             return "Unknown", ["❌ Hugging Face Token is missing."]
 
-        # We use a free, fast model suitable for analysis
+        # Use the variable instead of the hardcoded string
         client = InferenceClient(model="HuggingFaceH4/zephyr-7b-beta", token=HF_TOKEN)
 
         prompt = f"""<|system|>
@@ -39,8 +43,6 @@ Analyze this URL: {url}
 
         # Parsing Logic
         result = "Unknown"
-        explanation = []
-
         if "Status: Phishing" in text:
             result = "Phishing"
         elif "Status: Safe" in text:
@@ -48,11 +50,9 @@ Analyze this URL: {url}
         elif "Status: Suspicious" in text:
             result = "Suspicious"
         
-        # Extract bullet points
         explanation = [line.replace('- ', '').strip() for line in text.split('\n') if line.strip().startswith('-')]
 
         if result == "Unknown":
-            # Fallback if AI didn't follow format exactly
             result = "Suspicious"
             explanation = [text.strip()]
 

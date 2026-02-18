@@ -1,53 +1,55 @@
 import os
 from huggingface_hub import InferenceClient
+from dotenv import load_dotenv # Run: pip install python-dotenv
 
-HF_TOKEN = os.environ.get("HF_TOKEN", "")
+# Load variables from a local .env file
+load_dotenv()
 
-# We updated the model list to more recent, stable ones
-FREE_MODELS = [
-    "meta-llama/Llama-3.3-70B-Instruct", 
-    "mistralai/Mistral-7B-Instruct-v0.3",
-    "microsoft/Phi-3.5-mini-instruct",
-    "google/gemma-2-9b-it"
-]
+# Securely pull the token from the environment
+HF_TOKEN = os.getenv("HF_TOKEN")
 
 def configure_ai():
+    """Checks if the token is present."""
     if not HF_TOKEN:
-        print("⚠️ WARNING: No HF_TOKEN found.")
+        print("❌ ERROR: HF_TOKEN environment variable is missing!")
 
 def get_ai_explanation(url):
-    if not HF_TOKEN:
-        return "Unknown", ["❌ Error: AI Token missing."]
+    try:
+        if not HF_TOKEN:
+            return "Unknown", ["❌ Hugging Face Token is missing."]
 
-    last_error = ""
-    for model_id in FREE_MODELS:
-        try:
-            print(f"🔄 Connecting to: {model_id}...")
-            # The client automatically handles the new 'router' URL
-            client = InferenceClient(token=HF_TOKEN)
+        # Use the variable instead of a hardcoded string
+        client = InferenceClient(model="HuggingFaceH4/zephyr-7b-beta", token=HF_TOKEN)
 
-            # Using the modern 'chat.completions' style
-            response = client.chat.completions.create(
-                model=model_id,
-                messages=[
-                    {"role": "system", "content": "You are a cybersecurity expert."},
-                    {"role": "user", "content": f"Analyze this URL for phishing: {url}. Reply: Status: [Safe/Phishing/Suspicious] and 3 short reasons."}
-                ],
-                max_tokens=300
-            )
+        prompt = f"""<|system|>
+You are a cybersecurity expert. Analyze the following URL for phishing risks.
+Reply STRICTLY in this format:
+Status: [Phishing/Safe/Suspicious]
+- [Reason 1]
+- [Reason 2]
+- [Reason 3]
+</s>
+<|user|>
+Analyze this URL: {url}
+</s>
+<|assistant|>"""
 
-            text = response.choices[0].message.content.strip()
-            
-            result = "Safe"
-            if "Phishing" in text: result = "Phishing"
-            elif "Suspicious" in text: result = "Suspicious"
-            
-            explanation = [line.strip() for line in text.split('\n') if line.strip().startswith(('-', '*'))]
-            return result, explanation if explanation else [text.strip()]
+        response = client.text_generation(prompt, max_new_tokens=200)
+        text = response
+        
+        result = "Unknown"
+        if "Status: Phishing" in text: result = "Phishing"
+        elif "Status: Safe" in text: result = "Safe"
+        elif "Status: Suspicious" in text: result = "Suspicious"
+        
+        explanation = [line.replace('- ', '').strip() for line in text.split('\n') if line.strip().startswith('-')]
 
-        except Exception as e:
-            print(f"⚠️ {model_id} failed: {str(e)}")
-            last_error = str(e)
-            continue 
+        if result == "Unknown":
+            result = "Suspicious"
+            explanation = [text.strip()]
 
-    return "Unknown", [f"Error: API endpoint updated. Please use new router. {last_error}"]
+        return result, explanation
+
+    except Exception as e:
+        print(f"❌ AI Error: {e}")
+        return "Unknown", [f"Error: {str(e)}"]
