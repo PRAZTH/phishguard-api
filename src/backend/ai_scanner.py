@@ -1,54 +1,43 @@
 import os
 from huggingface_hub import InferenceClient
-from dotenv import load_dotenv # Run: pip install python-dotenv
+from dotenv import load_dotenv
 
-# Load variables from a local .env file
 load_dotenv()
-
-# Securely pull the token from the environment
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 def configure_ai():
-    """Checks if the token is present."""
     if not HF_TOKEN:
-        print("❌ ERROR: HF_TOKEN environment variable is missing!")
+        print("⚠️ WARNING: No HF_TOKEN found.")
 
 def get_ai_explanation(url):
     try:
         if not HF_TOKEN:
-            return "Unknown", ["❌ Hugging Face Token is missing."]
+            return "Unknown", ["❌ Error: AI Token missing."]
 
-        # Use the variable instead of a hardcoded string
-        client = InferenceClient(model="HuggingFaceH4/zephyr-7b-beta", token=HF_TOKEN)
+        # Initialize client
+        client = InferenceClient(token=HF_TOKEN)
 
-        prompt = f"""<|system|>
-You are a cybersecurity expert. Analyze the following URL for phishing risks.
-Reply STRICTLY in this format:
-Status: [Phishing/Safe/Suspicious]
-- [Reason 1]
-- [Reason 2]
-- [Reason 3]
-</s>
-<|user|>
-Analyze this URL: {url}
-</s>
-<|assistant|>"""
+        # Use chat.completions.create for 'conversational' task support
+        response = client.chat.completions.create(
+            model="HuggingFaceH4/zephyr-7b-beta",
+            messages=[
+                {"role": "system", "content": "You are a cybersecurity expert. Analyze URLs for phishing."},
+                {"role": "user", "content": f"Analyze this URL: {url}. Reply STRICTLY with Status: [Safe/Phishing/Suspicious] and 3 bullet points."}
+            ],
+            max_tokens=200
+        )
 
-        response = client.text_generation(prompt, max_new_tokens=200)
-        text = response
+        text = response.choices[0].message.content
+        print(f"🔹 AI Raw Response: {text}")
+
+        # Simple parsing
+        result = "Suspicious"
+        if "Status: Safe" in text: result = "Safe"
+        elif "Status: Phishing" in text: result = "Phishing"
         
-        result = "Unknown"
-        if "Status: Phishing" in text: result = "Phishing"
-        elif "Status: Safe" in text: result = "Safe"
-        elif "Status: Suspicious" in text: result = "Suspicious"
+        explanation = [line.strip() for line in text.split('\n') if line.strip().startswith(('-', '*'))]
         
-        explanation = [line.replace('- ', '').strip() for line in text.split('\n') if line.strip().startswith('-')]
-
-        if result == "Unknown":
-            result = "Suspicious"
-            explanation = [text.strip()]
-
-        return result, explanation
+        return result, explanation if explanation else [text.strip()]
 
     except Exception as e:
         print(f"❌ AI Error: {e}")
