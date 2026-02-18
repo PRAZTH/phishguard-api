@@ -1,6 +1,7 @@
 Flask==3.0.0
 flask-cors==4.0.0
 Flask-PyMongo==2.3.0
-huggingface-hub>=0.25.0  # 👈 Updated to latest
+huggingface-hub>=0.25.0
 gunicorn==21.2.0
 dnspython==2.6.1
+python-dotenv
