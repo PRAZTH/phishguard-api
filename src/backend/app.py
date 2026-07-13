@@ -10,7 +10,7 @@ app = Flask(__name__)
 CORS(app)  # Allows your React Native app to make requests without CORS blocks
 
 # MongoDB Connection - Pulls from environment or falls back to local for testing
-app.config["MONGO_URI"] = os.environ.get("MONGO_URI", "mongodb://localhost:27017/phishguard")
+app.config["MONGO_URI"] = os.environ.get("MONGO_URI", "")
 mongo = PyMongo(app)
 
 # Initialize AI environment check configurations
